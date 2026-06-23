@@ -15,9 +15,8 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install requests
-      - run: python news.py
+      - run: python news60s.py
         env:
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           MAIL_USER: ${{ secrets.MAIL_USER }}
           MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
