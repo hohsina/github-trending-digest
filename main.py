@@ -35,8 +35,11 @@ def scrape_trending(n=10):
     soup = BeautifulSoup(resp.text, "html.parser")
 
     repos = []
-    articles = soup.find_all("article", class_="Box-row")[:n]
-    for art in articles:
+    articles = soup.find_all("article", class_="Box-row")
+    if len(articles) < n:
+        # fallback: newer GitHub layout
+        articles = soup.select('[class*="Box-row"]')
+    for art in articles[:n]:
         h2 = art.find("h2")
         if not h2:
             continue
@@ -82,7 +85,7 @@ def fetch_readme(repo_name):
         if resp.status_code == 200:
             content_b64 = resp.json().get("content", "")
             text = base64.b64decode(content_b64).decode("utf-8", errors="ignore")
-            return text[:2000]
+            return text[:800]
     except Exception:
         pass
     return ""
@@ -94,7 +97,7 @@ def call_gemini(prompt):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 4096},
+        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 8192},
     }
     for attempt in range(3):
         resp = requests.post(url, json=payload, timeout=120)
@@ -218,6 +221,7 @@ def main():
 
     print("1/4 抓取 GitHub Trending...")
     repos = scrape_trending()
+    print(f"  获取到 {len(repos)} 个仓库")
 
     print("2/4 获取 README...")
     for i, r in enumerate(repos):
