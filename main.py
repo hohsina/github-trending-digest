@@ -89,17 +89,24 @@ def fetch_readme(repo_name):
 
 
 def call_gemini(prompt):
-    """调用 Gemini API 生成日报."""
+    """调用 Gemini API 生成日报，自动重试瞬时故障."""
+    import time as _time
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.3, "maxOutputTokens": 4096},
     }
-    resp = requests.post(url, json=payload, timeout=120)
-    if resp.status_code != 200:
+    for attempt in range(3):
+        resp = requests.post(url, json=payload, timeout=120)
+        if resp.status_code == 200:
+            data = resp.json()
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        if resp.status_code >= 500:
+            print(f"  Gemini {resp.status_code}, retry {attempt + 1}/3...")
+            _time.sleep(2 ** attempt)
+            continue
         raise RuntimeError(f"Gemini API error {resp.status_code}: {resp.text[:500]}")
-    data = resp.json()
-    return data["candidates"][0]["content"]["parts"][0]["text"]
+    raise RuntimeError(f"Gemini API error {resp.status_code}: {resp.text[:500]}")
 
 
 def build_prompt(repos):
