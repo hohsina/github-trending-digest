@@ -1,6 +1,6 @@
 """
-GitHub Trending 日报 — 抓取 + Gemini 分析 + 邮件推送
-永久免费：GitHub Actions (免费) + Gemini API (永久免费层) + Gmail (免费)
+GitHub Trending 日报 — 抓取 + LLM 分析 + 邮件推送
+永久免费：GitHub Actions (免费) + Agnes AI (免费) + 邮箱 SMTP (免费)
 """
 import os
 import sys
@@ -14,12 +14,13 @@ from datetime import datetime, timezone, timedelta
 from bs4 import BeautifulSoup
 
 # ── 配置（全部从环境变量读取） ──
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+LLM_API_KEY = os.getenv("LLM_API_KEY", "")
+LLM_BASE_URL = os.getenv("LLM_BASE_URL") or "https://apihub.agnes-ai.com/v1"
+LLM_MODEL = os.getenv("LLM_MODEL") or "agnes-2.0-flash"
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 MAIL_USER = os.getenv("MAIL_USER", "")
 MAIL_PASSWORD = os.getenv("MAIL_PASSWORD", "")
 MAIL_TO = os.getenv("MAIL_TO") or MAIL_USER
-GEMINI_MODEL = os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
 # SMTP 默认 Gmail，QQ邮箱设 SMTP_HOST=smtp.qq.com
 SMTP_HOST = os.getenv("SMTP_HOST") or "smtp.gmail.com"
 SMTP_PORT = int(os.getenv("SMTP_PORT") or "465")
@@ -91,25 +92,28 @@ def fetch_readme(repo_name):
     return ""
 
 
-def call_gemini(prompt):
-    """调用 Gemini API 生成日报，自动重试瞬时故障."""
+def call_llm(prompt):
+    """调用 LLM (OpenAI 兼容) 生成日报，自动重试瞬时故障."""
     import time as _time
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
+    url = f"{LLM_BASE_URL}/chat/completions"
     payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 8192},
+        "model": LLM_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.3,
+        "max_tokens": 8192,
     }
+    headers = {"Authorization": f"Bearer {LLM_API_KEY}", "Content-Type": "application/json"}
     for attempt in range(3):
-        resp = requests.post(url, json=payload, timeout=120)
+        resp = requests.post(url, json=payload, headers=headers, timeout=120)
         if resp.status_code == 200:
             data = resp.json()
-            return data["candidates"][0]["content"]["parts"][0]["text"]
+            return data["choices"][0]["message"]["content"]
         if resp.status_code >= 500:
-            print(f"  Gemini {resp.status_code}, retry {attempt + 1}/3...")
+            print(f"  LLM {resp.status_code}, retry {attempt + 1}/3...")
             _time.sleep(2 ** attempt)
             continue
-        raise RuntimeError(f"Gemini API error {resp.status_code}: {resp.text[:500]}")
-    raise RuntimeError(f"Gemini API error {resp.status_code}: {resp.text[:500]}")
+        raise RuntimeError(f"LLM API error {resp.status_code}: {resp.text[:500]}")
+    raise RuntimeError(f"LLM API error {resp.status_code}: {resp.text[:500]}")
 
 
 def build_prompt(repos):
@@ -213,7 +217,7 @@ def send_email(html_body):
 
 def main():
     errors = []
-    for var in ("GEMINI_API_KEY", "MAIL_USER", "MAIL_PASSWORD"):
+    for var in ("LLM_API_KEY", "MAIL_USER", "MAIL_PASSWORD"):
         if not os.getenv(var):
             errors.append(f"缺少环境变量: {var}")
     if errors:
@@ -228,9 +232,9 @@ def main():
         print(f"  [{i+1}/{len(repos)}] {r['name']}")
         r["readme"] = fetch_readme(r["name"])
 
-    print("3/4 调用 Gemini 生成日报...")
+    print("3/4 调用 LLM 生成日报...")
     prompt = build_prompt(repos)
-    newsletter = call_gemini(prompt)
+    newsletter = call_llm(prompt)
 
     print("4/4 发送邮件...")
     html = render_html(newsletter)
