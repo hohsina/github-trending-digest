@@ -74,10 +74,11 @@ def build_prompt(news_list):
 
 【规则】
 1. 只输出提供的 {len(news_list)} 条新闻，不添加、不遗漏
-2. 每条输出：标题 + 一句话概括 + 热度指数
-3. 标题保持原标题不变
-4. 开头写一句当日要闻概括
-5. 简洁，不要啰嗦点评
+2. 每条必须包含：原标题 + 链接 + 2-3 句话概述 + 热度
+3. 链接直接从数据中的 url 字段复制，必须逐字照抄
+4. 概述基于标题展开，说清楚这条新闻讲了什么，不要空洞点评
+5. 标题保持原标题不变
+6. 开头写一句当日要闻概括
 
 【输出格式】
 
@@ -88,8 +89,10 @@ def build_prompt(news_list):
 ---
 [依次输出全部 {len(news_list)} 条]
 
-① {{原标题}} 🔥{{热度}}
-📝 {{一句话概括}}
+① {{原标题}}
+🔥 热度 {{热度值}}
+🔗 {{链接}}
+📝 {{2-3 句话概述}}
 
 ---
 ━━━━━━━━━━━━━━━━━━━━━━
@@ -101,6 +104,7 @@ def build_prompt(news_list):
 
 def render_html(text):
     """纯文本 → HTML 邮件."""
+    import re
     lines = text.split("\n")
     body_lines = []
     for line in lines:
@@ -115,10 +119,15 @@ def render_html(text):
             body_lines.append(f'<p style="color:#999;font-size:12px;">{line[2:]}</p>')
         elif line.startswith("今日要闻"):
             body_lines.append(f'<p style="color:#555;font-size:14px;margin:8px 0;">{line}</p>')
-        elif line.startswith("①") or line.startswith("②") or line.startswith("③") or line.startswith("④") or line.startswith("⑤") or line.startswith("⑥") or line.startswith("⑦") or line.startswith("⑧") or line.startswith("⑨") or line.startswith("⑩"):
+        elif any(line.startswith(f"{d}⃣") or line.startswith(f"{d} ") for d in "①②③④⑤⑥⑦⑧⑨⑩"):
             body_lines.append(f'<h3 style="margin:16px 0 4px;color:#1a1a2e;">{line}</h3>')
+        elif line.startswith("🔥"):
+            body_lines.append(f'<p style="margin:2px 0;color:#e67e22;font-size:13px;">{line}</p>')
+        elif line.startswith("🔗"):
+            url = line[2:].strip()
+            body_lines.append(f'<p style="margin:2px 0;"><a href="{url}" style="color:#3498db;font-size:13px;">{url}</a></p>')
         elif line.startswith("📝"):
-            body_lines.append(f'<p style="margin:2px 0 8px 16px;color:#333;font-size:14px;">{line}</p>')
+            body_lines.append(f'<p style="margin:4px 0 12px;color:#333;font-size:14px;line-height:1.7;">{line}</p>')
         else:
             body_lines.append(f'<p style="margin:2px 0;color:#333;font-size:14px;">{line}</p>')
     body = "\n".join(body_lines)
