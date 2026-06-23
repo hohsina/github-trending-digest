@@ -21,8 +21,8 @@ MAIL_PASSWORD = os.getenv("MAIL_PASSWORD", "")
 MAIL_TO = os.getenv("MAIL_TO", MAIL_USER)
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 # SMTP 默认 Gmail，QQ邮箱设 SMTP_HOST=smtp.qq.com
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "465"))
+SMTP_HOST = os.getenv("SMTP_HOST") or "smtp.gmail.com"
+SMTP_PORT = int(os.getenv("SMTP_PORT") or "465")
 
 BEIJING = timezone(timedelta(hours=8))
 
