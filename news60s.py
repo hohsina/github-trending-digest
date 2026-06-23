@@ -1,5 +1,5 @@
 """
-每日新闻早报 — 60s 简报 + 头条热榜，一封信两份内容，零 LLM 零幻觉
+每日新闻早报 — 60s 简报 + 头条热榜 + 微博热搜，一封信三份内容，零 LLM 零幻觉
 """
 import os
 import sys
@@ -18,6 +18,7 @@ SMTP_PORT = int(os.getenv("SMTP_PORT") or "465")
 BEIJING = timezone(timedelta(hours=8))
 API_60S = "https://60s.viki.moe/v2/60s"
 API_TOUTIAO = "https://60s.viki.moe/v2/toutiao"
+API_WEIBO = "https://60s.viki.moe/v2/weibo"
 
 NUMS = "①②③④⑤⑥⑦⑧⑨⑩"
 
@@ -40,7 +41,16 @@ def fetch_toutiao(n=10):
             for i in items]
 
 
-def build_html(news60s, date_str, toutiao):
+def fetch_weibo(n=10):
+    resp = requests.get(API_WEIBO, timeout=15)
+    resp.raise_for_status()
+    data = resp.json()
+    items = data.get("data", [])[:n]
+    return [{"title": i["title"], "hot": i.get("hot_value", 0), "url": i.get("link", "")}
+            for i in items]
+
+
+def build_html(news60s, date_str, toutiao, weibo):
     today = datetime.now(BEIJING).strftime("%Y-%m-%d")
 
     # ── 60s 简报部分 ──
@@ -72,10 +82,27 @@ def build_html(news60s, date_str, toutiao):
             f'{t["title"]} <span style="color:#e67e22;font-size:12px;">🔥{hot_str}</span>{url_html}</td></tr>')
     parts.append("</table>")
 
+    # ── 微博热搜部分 ──
+    parts.append(f"""<br><br>
+<hr style="border:2px solid #e0245e;">
+<h2 style="color:#e0245e;margin:16px 0 4px;">🔥 微博热搜 Top 10</h2>
+<p style="color:#999;font-size:12px;margin:0 0 16px;">来源: 微博 · 实时热搜</p>
+<hr style="border:1px solid #eee;">
+<table style="width:100%;border-collapse:collapse;">""")
+    for i, w in enumerate(weibo):
+        num = NUMS[i] if i < 10 else str(i + 1)
+        hot_str = f"{w['hot'] / 10000:.0f}万" if w['hot'] >= 10000 else str(w['hot'])
+        url_html = f'<br><a href="{w["url"]}" style="color:#e0245e;font-size:12px;">{w["url"]}</a>' if w["url"] else ""
+        parts.append(
+            f'<tr><td style="vertical-align:top;padding:8px 10px 8px 0;color:#e0245e;font-weight:bold;font-size:16px;">{num}</td>'
+            f'<td style="vertical-align:top;padding:8px 0;font-size:14px;line-height:1.6;color:#333;">'
+            f'{w["title"]} <span style="color:#e0245e;font-size:12px;">🔥{hot_str}</span>{url_html}</td></tr>')
+    parts.append("</table>")
+
     # ── 页脚 ──
     parts.append(f"""<br>
 <hr style="border:1px solid #eee;">
-<p style="color:#999;font-size:12px;">每日 UTC 00:10 自动推送 · 数据来自 60s API &amp; 今日头条</p>""")
+<p style="color:#999;font-size:12px;">每日 UTC 00:02 自动推送 · 60s 简报 &amp; 头条 &amp; 微博</p>""")
 
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
@@ -103,16 +130,20 @@ def main():
         if not os.getenv(var):
             sys.exit(f"缺少环境变量: {var}")
 
-    print("1/3 获取 60s 新闻简报...")
+    print("1/4 获取 60s 新闻简报...")
     news60s, date_str = fetch_60s()
     print(f"  {len(news60s)} 条, 日期 {date_str}")
 
-    print("2/3 获取头条热榜...")
+    print("2/4 获取头条热榜...")
     toutiao = fetch_toutiao()
     print(f"  {len(toutiao)} 条")
 
-    print("3/3 发送邮件...")
-    html = build_html(news60s, date_str, toutiao)
+    print("3/4 获取微博热搜...")
+    weibo = fetch_weibo()
+    print(f"  {len(weibo)} 条")
+
+    print("4/4 发送邮件...")
+    html = build_html(news60s, date_str, toutiao, weibo)
     send_email(html)
     print("Done!")
 
