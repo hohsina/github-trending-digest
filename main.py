@@ -122,34 +122,40 @@ def build_prompt(repos):
     today = datetime.now(BEIJING).strftime("%Y-%m-%d")
     repos_json = json.dumps(repos, ensure_ascii=False, indent=2)
 
-    template = """你是资深开源技术主编。根据以下 JSON 数据撰写今日 GitHub Trending 日报。
+    template = """你是技术编辑。根据以下 JSON 数据撰写今日 GitHub Trending 日报。JSON 中的每一项都对应一个真实仓库。
 
-【严格约束】
-1. 项目简介和点评必须 100% 基于提供的 readme 和 description，禁止使用预训练知识编造
-2. 如果 readme 提到 Beta/Experimental/WIP，必须在点评中指出成熟度风险
-3. Star 数使用 JSON 中的精确数字，禁止用"数百""近千"等模糊词
-4. 每项控制在 3-5 行，点评要毒辣、说人话
+【最高优先级 — 违反即为失败】
+1. 只输出 JSON 中存在的仓库，一个不多一个不少。不允许从预训练记忆中补充任何仓库。
+2. 所有数字（Star、技能数、版本号等）必须与 JSON 或 readme 原文逐字一致。禁止四舍五入、禁止改写、禁止用约数。
+3. readme 中提到的许可证名称必须原文照抄（如 MIT、Apache 2.0、AGPLv3）。readme 没提许可证就不准写许可证。
+4. 技能数、工具数等关键指标必须从 readme 中精确引用，不得自行计算或改写。
 
-【输出格式 — 严格按此模板】
+【次优先级】
+5. 简介和点评基于 readme + description，不得编造项目背景、商业故事、竞品对比
+6. readme 提到 Beta/Experimental/WIP 的，点评中必须指出成熟度风险
+7. Star 数用 JSON 中的精确值，不用"数百""近千"等模糊词
+8. 每条点评 2-3 句，说人话，不要啰嗦
+
+【输出格式】
 
 📰 GitHub Trending 日报 | {today}
 ━━━━━━━━━━━━━━━━━━━━━━
 今日看点：[一句话总结今日榜单趋势]
 
 ---
-[依次输出 1-10，格式如下]
+[依次输出全部 10 个仓库]
 
 ### ① {{项目名}}
 ⭐ {{总星数}} · 今日 +{{今日新增}} · {{语言}}
 🔗 {{链接}}
-📝 {{一句话简介}}
-💬 {{点评}}
+📝 {{一句话简介（基于 readme）}}
+💬 {{点评（基于 readme 事实）}}
 
 ---
 ━━━━━━━━━━━━━━━━━━━━━━
-📡 数据来源: github.com/trending · 每日 UTC 00:00 自动生成
+📡 数据来源: github.com/trending · 每日自动生成
 
-【输入数据】
+【输入 JSON 数据 — 以下每个仓库都必须出现在输出中】
 {repos_json}"""
     return template.replace("{today}", today).replace("{repos_json}", repos_json)
 
