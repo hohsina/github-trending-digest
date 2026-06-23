@@ -93,7 +93,7 @@ def fetch_readme(repo_name):
 
 
 def call_llm(prompt):
-    """调用 LLM (OpenAI 兼容) 生成日报，自动重试瞬时故障."""
+    """调用 LLM (OpenAI 兼容) 生成日报，失败自动重试直到成功."""
     import time as _time
     url = f"{LLM_BASE_URL}/chat/completions"
     payload = {
@@ -103,17 +103,18 @@ def call_llm(prompt):
         "max_tokens": 8192,
     }
     headers = {"Authorization": f"Bearer {LLM_API_KEY}", "Content-Type": "application/json"}
-    for attempt in range(3):
+    attempt = 0
+    while True:
+        attempt += 1
         resp = requests.post(url, json=payload, headers=headers, timeout=120)
         if resp.status_code == 200:
             data = resp.json()
             return data["choices"][0]["message"]["content"]
-        if resp.status_code >= 500:
-            print(f"  LLM {resp.status_code}, retry {attempt + 1}/3...")
-            _time.sleep(2 ** attempt)
-            continue
-        raise RuntimeError(f"LLM API error {resp.status_code}: {resp.text[:500]}")
-    raise RuntimeError(f"LLM API error {resp.status_code}: {resp.text[:500]}")
+        if resp.status_code == 400:
+            raise RuntimeError(f"LLM API error {resp.status_code}: {resp.text[:500]}")
+        delay = min(attempt * 60, 300)  # 渐进：60s → 120s → 180s → 240s → 300s (封顶)
+        print(f"  LLM {resp.status_code}, {delay}s 后重试 (第 {attempt} 次)...")
+        _time.sleep(delay)
 
 
 def build_prompt(repos):
