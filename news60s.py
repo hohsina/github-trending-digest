@@ -1,5 +1,6 @@
 """
-每日新闻早报 — 60s 简报 + 头条 + 微博 + 抖音，一封信四份内容，零 LLM 零幻觉
+每日新闻早报 — 60s 简报 + 头条 + 微博 + 抖音 + 知乎 + 百度 + 小红书
+一封信七份内容，零 LLM 零幻觉
 """
 import os
 import sys
@@ -20,6 +21,9 @@ API_60S = "https://60s.viki.moe/v2/60s"
 API_TOUTIAO = "https://60s.viki.moe/v2/toutiao"
 API_WEIBO = "https://60s.viki.moe/v2/weibo"
 API_DOUYIN = "https://60s.viki.moe/v2/douyin"
+API_ZHIHU = "https://60s.viki.moe/v2/zhihu"
+API_BAIDU = "https://60s.viki.moe/v2/baidu/hot"
+API_REDNOTE = "https://60s.viki.moe/v2/rednote"
 
 NUMS = "①②③④⑤⑥⑦⑧⑨⑩"
 
@@ -60,12 +64,57 @@ def fetch_douyin(n=10):
             for i in items]
 
 
-def build_html(news60s, date_str, toutiao, weibo, douyin):
+def fetch_zhihu(n=10):
+    resp = requests.get(API_ZHIHU, timeout=15)
+    resp.raise_for_status()
+    data = resp.json()
+    items = data.get("data", [])[:n]
+    return [{"title": i["title"], "hot_desc": i.get("hot_value_desc", ""), "url": i.get("link", "")}
+            for i in items]
+
+
+def fetch_baidu(n=10):
+    resp = requests.get(API_BAIDU, timeout=15)
+    resp.raise_for_status()
+    data = resp.json()
+    items = data.get("data", [])[:n]
+    return [{"title": i["title"], "hot_desc": i.get("score_desc", ""), "url": i.get("url", "")}
+            for i in items]
+
+
+def fetch_rednote(n=10):
+    resp = requests.get(API_REDNOTE, timeout=15)
+    resp.raise_for_status()
+    data = resp.json()
+    items = data.get("data", [])[:n]
+    return [{"title": i["title"], "hot_desc": str(i.get("score", "")), "url": i.get("link", "")}
+            for i in items]
+
+
+def _section(name, color, icon, items, show_hot=True):
+    parts = [f"""<br><br>
+<hr style="border:2px solid {color};">
+<h2 style="color:{color};margin:16px 0 4px;">{icon} {name} Top 10</h2>
+<p style="color:#999;font-size:12px;margin:0 0 16px;">来源: 60s API · 实时热搜</p>
+<hr style="border:1px solid #eee;">
+<table style="width:100%;border-collapse:collapse;">"""]
+    for i, item in enumerate(items):
+        num = NUMS[i] if i < 10 else str(i + 1)
+        hot_html = f' <span style="color:{color};font-size:12px;">🔥{item.get("hot_desc") or item.get("hot", "")}</span>' if show_hot and (item.get("hot_desc") or item.get("hot")) else ""
+        url_html = f'<br><a href="{item["url"]}" style="color:{color};font-size:12px;">{item["url"]}</a>' if item.get("url") else ""
+        parts.append(
+            f'<tr><td style="vertical-align:top;padding:8px 10px 8px 0;color:{color};font-weight:bold;font-size:16px;">{num}</td>'
+            f'<td style="vertical-align:top;padding:8px 0;font-size:14px;line-height:1.6;color:#333;">'
+            f'{item["title"]}{hot_html}{url_html}</td></tr>')
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def build_html(news60s, date_str, toutiao, weibo, douyin, zhihu, baidu_hot, rednote):
     today = datetime.now(BEIJING).strftime("%Y-%m-%d")
 
-    # ── 60s 简报部分 ──
     parts = [f"""<h2 style="color:#1a1a2e;margin:0 0 4px;">📰 每日新闻早报 | {today}</h2>
-<p style="color:#999;font-size:12px;margin:0 0 16px;">来源: 60s 读懂世界 · 聚合全网权威新闻</p>
+<p style="color:#999;font-size:12px;margin:0 0 16px;">聚合全网权威新闻与热搜</p>
 <hr style="border:1px solid #eee;">
 <table style="width:100%;border-collapse:collapse;">"""]
     for i, n in enumerate(news60s):
@@ -75,61 +124,16 @@ def build_html(news60s, date_str, toutiao, weibo, douyin):
             f'<td style="vertical-align:top;padding:8px 0;font-size:14px;line-height:1.8;color:#333;">{n}</td></tr>')
     parts.append("</table>")
 
-    # ── 头条热榜部分 ──
-    parts.append(f"""<br><br>
-<hr style="border:2px solid #1a1a2e;">
-<h2 style="color:#1a1a2e;margin:16px 0 4px;">🔥 今日头条热榜 Top 10</h2>
-<p style="color:#999;font-size:12px;margin:0 0 16px;">来源: 今日头条 · 实时热搜</p>
-<hr style="border:1px solid #eee;">
-<table style="width:100%;border-collapse:collapse;">""")
-    for i, t in enumerate(toutiao):
-        num = NUMS[i] if i < 10 else str(i + 1)
-        hot_str = f"{t['hot'] / 10000:.0f}万" if t['hot'] >= 10000 else str(t['hot'])
-        url_html = f'<br><a href="{t["url"]}" style="color:#3498db;font-size:12px;">{t["url"]}</a>' if t["url"] else ""
-        parts.append(
-            f'<tr><td style="vertical-align:top;padding:8px 10px 8px 0;color:#1a1a2e;font-weight:bold;font-size:16px;">{num}</td>'
-            f'<td style="vertical-align:top;padding:8px 0;font-size:14px;line-height:1.6;color:#333;">'
-            f'{t["title"]} <span style="color:#e67e22;font-size:12px;">🔥{hot_str}</span>{url_html}</td></tr>')
-    parts.append("</table>")
+    parts.append(_section("今日头条热榜", "#1a1a2e", "🔥", toutiao))
+    parts.append(_section("微博热搜", "#e0245e", "🔥", weibo))
+    parts.append(_section("抖音热搜", "#010101", "🎵", douyin))
+    parts.append(_section("知乎热搜", "#1772f0", "💡", zhihu))
+    parts.append(_section("百度热搜", "#4e6ef2", "🔍", baidu_hot))
+    parts.append(_section("小红书热搜", "#ff2442", "📕", rednote))
 
-    # ── 微博热搜部分 ──
-    parts.append(f"""<br><br>
-<hr style="border:2px solid #e0245e;">
-<h2 style="color:#e0245e;margin:16px 0 4px;">🔥 微博热搜 Top 10</h2>
-<p style="color:#999;font-size:12px;margin:0 0 16px;">来源: 微博 · 实时热搜</p>
-<hr style="border:1px solid #eee;">
-<table style="width:100%;border-collapse:collapse;">""")
-    for i, w in enumerate(weibo):
-        num = NUMS[i] if i < 10 else str(i + 1)
-        hot_str = f"{w['hot'] / 10000:.0f}万" if w['hot'] >= 10000 else str(w['hot'])
-        url_html = f'<br><a href="{w["url"]}" style="color:#e0245e;font-size:12px;">{w["url"]}</a>' if w["url"] else ""
-        parts.append(
-            f'<tr><td style="vertical-align:top;padding:8px 10px 8px 0;color:#e0245e;font-weight:bold;font-size:16px;">{num}</td>'
-            f'<td style="vertical-align:top;padding:8px 0;font-size:14px;line-height:1.6;color:#333;">'
-            f'{w["title"]} <span style="color:#e0245e;font-size:12px;">🔥{hot_str}</span>{url_html}</td></tr>')
-    parts.append("</table>")
-
-    # ── 抖音热搜部分 ──
-    parts.append(f"""<br><br>
-<hr style="border:2px solid #010101;">
-<h2 style="color:#010101;margin:16px 0 4px;">🎵 抖音热搜 Top 10</h2>
-<p style="color:#999;font-size:12px;margin:0 0 16px;">来源: 抖音 · 实时热搜</p>
-<hr style="border:1px solid #eee;">
-<table style="width:100%;border-collapse:collapse;">""")
-    for i, dy in enumerate(douyin):
-        num = NUMS[i] if i < 10 else str(i + 1)
-        hot_str = f"{dy['hot'] / 10000:.0f}万" if dy['hot'] >= 10000 else str(dy['hot'])
-        url_html = f'<br><a href="{dy["url"]}" style="color:#010101;font-size:12px;">{dy["url"]}</a>' if dy.get("url") else ""
-        parts.append(
-            f'<tr><td style="vertical-align:top;padding:8px 10px 8px 0;color:#010101;font-weight:bold;font-size:16px;">{num}</td>'
-            f'<td style="vertical-align:top;padding:8px 0;font-size:14px;line-height:1.6;color:#333;">'
-            f'{dy["title"]} <span style="color:#010101;font-size:12px;">🔥{hot_str}</span>{url_html}</td></tr>')
-    parts.append("</table>")
-
-    # ── 页脚 ──
     parts.append(f"""<br>
 <hr style="border:1px solid #eee;">
-<p style="color:#999;font-size:12px;">每日 UTC 00:09 自动推送 · 60s 简报 &amp; 头条 &amp; 微博 &amp; 抖音</p>""")
+<p style="color:#999;font-size:12px;">每日 UTC 00:09 自动推送 · 60s 简报 &amp; 7 大热榜</p>""")
 
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
@@ -157,24 +161,36 @@ def main():
         if not os.getenv(var):
             sys.exit(f"缺少环境变量: {var}")
 
-    print("1/5 获取 60s 新闻简报...")
+    print("1/8 获取 60s 新闻简报...")
     news60s, date_str = fetch_60s()
     print(f"  {len(news60s)} 条, 日期 {date_str}")
 
-    print("2/5 获取头条热榜...")
+    print("2/8 获取头条热榜...")
     toutiao = fetch_toutiao()
     print(f"  {len(toutiao)} 条")
 
-    print("3/5 获取微博热搜...")
+    print("3/8 获取微博热搜...")
     weibo = fetch_weibo()
     print(f"  {len(weibo)} 条")
 
-    print("4/5 获取抖音热搜...")
+    print("4/8 获取抖音热搜...")
     douyin = fetch_douyin()
     print(f"  {len(douyin)} 条")
 
-    print("5/5 发送邮件...")
-    html = build_html(news60s, date_str, toutiao, weibo, douyin)
+    print("5/8 获取知乎热搜...")
+    zhihu = fetch_zhihu()
+    print(f"  {len(zhihu)} 条")
+
+    print("6/8 获取百度热搜...")
+    baidu_hot = fetch_baidu()
+    print(f"  {len(baidu_hot)} 条")
+
+    print("7/8 获取小红书热搜...")
+    rednote = fetch_rednote()
+    print(f"  {len(rednote)} 条")
+
+    print("8/8 发送邮件...")
+    html = build_html(news60s, date_str, toutiao, weibo, douyin, zhihu, baidu_hot, rednote)
     send_email(html)
     print("Done!")
 
