@@ -2,8 +2,8 @@ name: Daily News Digest
 
 on:
   schedule:
-    # UTC 00:02 = Beijing 08:02
-    - cron: "2 0 * * *"
+    # UTC 00:09 = Beijing 08:09
+    - cron: "9 0 * * *"
   workflow_dispatch:
 
 jobs:
