@@ -119,10 +119,11 @@ def build_html(news60s, date_str, toutiao, weibo, douyin):
     for i, dy in enumerate(douyin):
         num = NUMS[i] if i < 10 else str(i + 1)
         hot_str = f"{dy['hot'] / 10000:.0f}万" if dy['hot'] >= 10000 else str(dy['hot'])
+        url_html = f'<br><a href="{dy["url"]}" style="color:#010101;font-size:12px;">{dy["url"]}</a>' if dy.get("url") else ""
         parts.append(
             f'<tr><td style="vertical-align:top;padding:8px 10px 8px 0;color:#010101;font-weight:bold;font-size:16px;">{num}</td>'
             f'<td style="vertical-align:top;padding:8px 0;font-size:14px;line-height:1.6;color:#333;">'
-            f'{dy["title"]} <span style="color:#010101;font-size:12px;">🔥{hot_str}</span></td></tr>')
+            f'{dy["title"]} <span style="color:#010101;font-size:12px;">🔥{hot_str}</span>{url_html}</td></tr>')
     parts.append("</table>")
 
     # ── 页脚 ──
