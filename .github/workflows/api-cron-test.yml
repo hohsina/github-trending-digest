@@ -1,10 +1,10 @@
 name: API Cron Test
 on:
   schedule:
-    - cron: "48 2 * * *"
+    - cron: "44 2 * * *"
   workflow_dispatch:
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "API CREATED CRON at $(date -u)"
+      - run: echo "API CRON WORKS at $(date -u)"
