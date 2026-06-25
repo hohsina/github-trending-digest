@@ -4,7 +4,7 @@ on:
     branches: [main]
     paths: ['.trigger']
   schedule:
-    - cron: "7 0 * * *"
+    - cron: "49 2 * * *"
   workflow_dispatch:
 
 jobs:
