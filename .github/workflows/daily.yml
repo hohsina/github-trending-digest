@@ -2,8 +2,8 @@ name: Daily Digest
 
 on:
   schedule:
-    # UTC 00:07 = Beijing 08:07
-    - cron: "7 0 * * *"
+    # 测试 cron: 01:38 UTC
+    - cron: "38 1 * * *"
   workflow_dispatch:
 
 jobs:
