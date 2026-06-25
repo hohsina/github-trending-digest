@@ -2,8 +2,8 @@ name: Daily Digest
 
 on:
   schedule:
-    # 测试 cron: 01:38 UTC
-    - cron: "38 1 * * *"
+    # 每 5 分钟触发一次（测试模式）
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 jobs:
