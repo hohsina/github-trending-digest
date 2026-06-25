@@ -1,0 +1,10 @@
+name: SC
+on:
+  schedule:
+    - cron: "5 4 * * *"
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "OK $(date -u)"
+
