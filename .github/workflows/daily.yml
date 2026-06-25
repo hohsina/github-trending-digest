@@ -1,7 +1,10 @@
 name: Daily Digest
 on:
+  push:
+    branches: [main]
+    paths: ['.trigger']
   schedule:
-    - cron: "38 2 * * *"
+    - cron: "7 0 * * *"
   workflow_dispatch:
 
 jobs:
