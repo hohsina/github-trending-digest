@@ -4,11 +4,28 @@
 """
 import os
 import sys
+import time
 import smtplib
 import requests
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timezone, timedelta
+
+
+def _get(url, timeout=15, retries=3):
+    """带重试和延迟的 GET，防止 429 限流"""
+    for attempt in range(retries):
+        resp = requests.get(url, timeout=timeout)
+        if resp.status_code == 429:
+            wait = (attempt + 1) * 3
+            print(f"  429 限流，{wait}s 后重试...")
+            time.sleep(wait)
+            continue
+        resp.raise_for_status()
+        time.sleep(0.5)  # 请求间隔，避免连续轰炸 API
+        return resp
+    resp.raise_for_status()
+    return resp
 
 MAIL_USER = os.getenv("MAIL_USER", "")
 MAIL_PASSWORD = os.getenv("MAIL_PASSWORD", "")
@@ -29,7 +46,7 @@ NUMS = "①②③④⑤⑥⑦⑧⑨⑩"
 
 
 def fetch_60s(n=10):
-    resp = requests.get(API_60S, timeout=15)
+    resp = _get(API_60S, timeout=15)
     resp.raise_for_status()
     data = resp.json()
     news = data.get("data", {}).get("news", [])
@@ -38,7 +55,7 @@ def fetch_60s(n=10):
 
 
 def fetch_toutiao(n=10):
-    resp = requests.get(API_TOUTIAO, timeout=15)
+    resp = _get(API_TOUTIAO, timeout=15)
     resp.raise_for_status()
     data = resp.json()
     items = data.get("data", [])[:n]
@@ -47,7 +64,7 @@ def fetch_toutiao(n=10):
 
 
 def fetch_weibo(n=10):
-    resp = requests.get(API_WEIBO, timeout=15)
+    resp = _get(API_WEIBO, timeout=15)
     resp.raise_for_status()
     data = resp.json()
     items = data.get("data", [])[:n]
@@ -56,7 +73,7 @@ def fetch_weibo(n=10):
 
 
 def fetch_douyin(n=10):
-    resp = requests.get(API_DOUYIN, timeout=15)
+    resp = _get(API_DOUYIN, timeout=15)
     resp.raise_for_status()
     data = resp.json()
     items = data.get("data", [])[:n]
@@ -65,7 +82,7 @@ def fetch_douyin(n=10):
 
 
 def fetch_zhihu(n=10):
-    resp = requests.get(API_ZHIHU, timeout=15)
+    resp = _get(API_ZHIHU, timeout=15)
     resp.raise_for_status()
     data = resp.json()
     items = data.get("data", [])[:n]
@@ -74,7 +91,7 @@ def fetch_zhihu(n=10):
 
 
 def fetch_baidu(n=10):
-    resp = requests.get(API_BAIDU, timeout=15)
+    resp = _get(API_BAIDU, timeout=15)
     resp.raise_for_status()
     data = resp.json()
     items = data.get("data", [])[:n]
@@ -83,7 +100,7 @@ def fetch_baidu(n=10):
 
 
 def fetch_rednote(n=10):
-    resp = requests.get(API_REDNOTE, timeout=15)
+    resp = _get(API_REDNOTE, timeout=15)
     resp.raise_for_status()
     data = resp.json()
     items = data.get("data", [])[:n]
